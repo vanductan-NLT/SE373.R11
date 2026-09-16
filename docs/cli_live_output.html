@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>CLI live output - Issue Triage</title>
+  <style>
+    body { margin: 0; background: #101614; color: #d7f3e4; font: 18px/1.55 Consolas, "Cascadia Code", monospace; }
+    section { margin: 0; padding: 34px 42px; min-height: 100vh; box-sizing: border-box; }
+    h1 { color: #6ee7b7; font: 700 26px/1.2 Arial, sans-serif; margin: 0 0 24px; }
+    pre { margin: 0; white-space: pre-wrap; }
+    .muted { color: #98b8a8; font-family: Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <section id="structured">
+    <h1>CLI - IssueTriage đã validate (live DeepSeek)</h1>
+    <pre>=== IssueTriage đã validate ===
+{
+  "status": "classified",
+  "severity": "P0",
+  "component": "payment",
+  "needs_urgent_response": true,
+  "reason": "Nút thanh toán trả HTTP 500 với mọi thẻ Visa, tất cả người dùng không thể hoàn tất thanh toán - outage diện rộng ảnh hưởng toàn bộ luồng thanh toán."
+}
+
+=== token usage ===
+classification: input=333, output=93
+tool_request: input=497, output=35
+final_response: input=330, output=173
+total: input=1160, output=301</pre>
+    <p class="muted">Nguồn: lần chạy cli.py --write-cost-report với DeepSeek deepseek-flash.</p>
+  </section>
+  <section id="trace">
+    <h1>CLI - Function-calling trace (live DeepSeek)</h1>
+    <pre>=== tool_call ===
+{
+  "id": "call_00_awBEEgxjQfOLC3UGFrKx8252",
+  "name": "get_component_owner",
+  "arguments": {
+    "component": "payment"
+  }
+}
+
+=== application executes ===
+get_component_owner('payment')
+
+=== tool_result ===
+{
+  "component": "payment",
+  "owner": "checkout-platform"
+}
+
+=== final response ===
+Severity: P0
+Component: payment
+Team phụ trách: checkout-platform
+Cần phản hồi khẩn cấp: Có
+Đề xuất: escalate ngay cho team checkout-platform.</pre>
+    <p class="muted">Application validate tool name, arguments và allowlist trước khi thực thi.</p>
+  </section>
+</body>
+</html>
