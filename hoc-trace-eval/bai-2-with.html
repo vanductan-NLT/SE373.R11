@@ -1,0 +1,287 @@
+<title>With và context manager · Bài 2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: trang dọc, giữa trang là một bộ chạy từng bước: hai khối code (bên trái) và nhật ký trace sinh ra (bên phải). */
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --ink:#16202C; --muted:#5A6576; --line:#D9DEE6;
+  --accent:#1D5BCF; --accent-soft:#E3ECFB; --ok:#17804F; --ok-soft:#DDF3E8; --err:#C03328; --err-soft:#FBE3E0;
+  --term-bg:#111923; --term-fg:#D6DEE9; --term-dim:#6F7C8E; --term-sel:#22344D; --term-line:#253244;
+  --c-kw:#E59AD6; --c-str:#A9D98B; --c-cmt:#6F7C8E; --c-fn:#7FB0FF; --c-hl:#F2B963;
+  --display:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif; --body:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1218; --surface:#141B24; --ink:#E5EAF1; --muted:#9AA5B5; --line:#283342;
+  --accent:#7DA6FF; --accent-soft:#1B2A45; --ok:#4CC98C; --ok-soft:#163626; --err:#F2786C; --err-soft:#3D1D1A;
+  --term-bg:#0A0F15; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0D1218; --surface:#141B24; --ink:#E5EAF1; --muted:#9AA5B5; --line:#283342;
+  --accent:#7DA6FF; --accent-soft:#1B2A45; --ok:#4CC98C; --ok-soft:#163626; --err:#F2786C; --err-soft:#3D1D1A;
+  --term-bg:#0A0F15; color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:52px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.6vw,42px);font-weight:800;letter-spacing:-.02em}
+h2{font-size:clamp(21px,2.6vw,26px);font-weight:800}
+p{margin:0}
+code{font-family:var(--mono);font-size:.88em}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);max-width:62ch}
+.sec{display:flex;flex-direction:column;gap:16px}
+.sec-head{display:flex;flex-direction:column;gap:6px}
+.sec-head .eyebrow{color:var(--accent)}
+.steps{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.step{font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.step.done{color:var(--ok);border-color:var(--ok)}
+.step.now{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+.btn{font:600 13px var(--body);border-radius:8px;padding:7px 12px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0A0F15}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#0A0F15}}
+.btn:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* cửa */
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card h3{margin:0;font-size:16px;font-family:var(--display)}
+.card.bad{border-color:var(--err)} .card.good{border-color:var(--ok)}
+.card .verdict{font-size:14px}
+.card.bad .verdict{color:var(--err)} .card.good .verdict{color:var(--ok)}
+pre.code{margin:0;background:var(--term-bg);color:var(--term-fg);border-radius:12px;padding:12px 0;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.75;border:1px solid var(--term-line)}
+pre.code .l{display:block;padding:0 14px;white-space:pre;border-left:3px solid transparent}
+pre.code .l.hl{background:var(--term-sel);border-left-color:var(--c-hl)}
+pre.code .l.err{background:#3B1E1E;border-left-color:#F2786C}
+.kw{color:var(--c-kw)} .st{color:var(--c-str)} .cm{color:var(--c-cmt)} .fn{color:var(--c-fn)}
+
+/* bộ chạy */
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg button{font:600 13px var(--body);padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.runner{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.lab{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px}
+.who{font-size:12px;font-weight:600;color:var(--c-hl);padding:0 14px 6px;font-family:var(--mono)}
+.logbox{background:var(--term-bg);color:var(--term-fg);border-radius:12px;border:1px solid var(--term-line);padding:12px 14px;min-height:128px;font-family:var(--mono);font-size:13px;line-height:1.8}
+.logbox .ph{color:var(--term-dim)}
+.logbox .row{white-space:pre-wrap;overflow-wrap:anywhere}
+.logbox .row.fresh{animation:pop .5s ease-out}
+@keyframes pop{from{background:var(--term-sel)}to{background:transparent}}
+.logbox .ok{color:#5FD3A0} .logbox .bad{color:#F2786C}
+.say{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:76px;font-size:15px}
+.say b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ctrl .count{font-size:13px;color:var(--muted);margin-left:auto;font-family:var(--mono)}
+
+/* nối repo */
+.map{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.map > div{border-top:2px solid var(--ink);padding-top:8px;display:flex;flex-direction:column;gap:4px}
+.map b{font-family:var(--mono);font-size:13px}
+.map span{font-size:14.5px;color:var(--muted)}
+.callout{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:15px}
+.end{background:var(--ink);color:var(--bg);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:6px}
+.end b{font-family:var(--display);font-size:19px}
+@media (max-width:820px){.runner{grid-template-columns:1fr}}
+@media (prefers-reduced-motion: reduce){.logbox .row.fresh{animation:none}}
+</style>
+
+<div class="wrap">
+  <header class="sec" style="gap:14px">
+    <span class="eyebrow">SE373 · Nhóm 15 · Issue #7</span>
+    <h1>With: mở cửa, làm việc, luôn đóng cửa</h1>
+    <p class="lede">Bài 2 giải thích đúng thứ nằm sau dòng <code>with span(...)</code> mà bạn thấy trong code trace.</p>
+    <div class="steps" aria-label="Lộ trình">
+      <span class="step done">1 · Bức tranh lớn</span>
+      <span class="step now">2 · with</span>
+      <span class="step">3 · decorator, ContextVar</span>
+      <span class="step">4 · Code #7</span>
+      <span class="step">5 · Thiết kế #8</span>
+    </div>
+  </header>
+
+  <section class="sec" aria-labelledby="h1s">
+    <div class="sec-head"><span class="eyebrow">Phần 1 · Vấn đề</span><h2 id="h1s">Quên đóng cửa</h2>
+      <p class="lede">Muốn ghi “bắt đầu” rồi “kết thúc”, bạn phải nhớ ghi “kết thúc” ngay cả khi giữa chừng có lỗi.</p></div>
+    <div class="two">
+      <div class="card bad">
+        <h3>Cách thủ công</h3>
+<pre class="code"><span class="l">ghi(<span class="st">"bắt đầu"</span>)</span><span class="l">tai_trang()      <span class="cm"># lỗi ở đây!</span></span><span class="l err">ghi(<span class="st">"kết thúc"</span>)   <span class="cm"># không bao giờ chạy tới</span></span></pre>
+        <p class="verdict">Trace có “bắt đầu” mà không có “kết thúc”. Đúng lúc cần biết nhất (lỗi) thì mất dấu.</p>
+      </div>
+      <div class="card good">
+        <h3>Cách dùng with</h3>
+<pre class="code"><span class="l"><span class="kw">with</span> span(<span class="st">"fetch_url"</span>):</span><span class="l">    tai_trang()  <span class="cm"># lỗi cũng không sao</span></span><span class="l">                 <span class="cm"># “kết thúc” vẫn được ghi</span></span></pre>
+        <p class="verdict">Python bảo đảm phần “đóng cửa” luôn chạy, dù bên trong ổn hay lỗi.</p>
+      </div>
+    </div>
+    <p class="lede">Bạn đã gặp cùng ý này ở <code>with open("file.txt") as f:</code>. Dùng xong file, Python tự đóng file, dù bên trong có lỗi hay không.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="h2s">
+    <div class="sec-head"><span class="eyebrow">Phần 2 · Chạy thử</span><h2 id="h2s">Xem từng dòng được chạy theo thứ tự nào</h2>
+      <p class="lede">Chọn một tình huống rồi bấm “Bước tiếp”. Dòng sáng là dòng đang chạy. Bên phải là trace sinh ra.</p></div>
+    <div class="seg" role="group" aria-label="Chọn tình huống">
+      <button type="button" data-sc="ok" aria-pressed="true">Bên trong chạy ổn</button>
+      <button type="button" data-sc="err" aria-pressed="false">Bên trong bị lỗi</button>
+      <button type="button" data-sc="nest" aria-pressed="false">Hai with lồng nhau</button>
+    </div>
+    <div class="runner">
+      <div class="stack">
+        <div>
+          <div class="lab">Code của bạn (người dùng span)</div>
+          <pre class="code" id="userCode"></pre>
+        </div>
+        <div>
+          <div class="lab">Code của span (người viết một lần, dùng nhiều nơi)</div>
+          <pre class="code" id="spanCode"></pre>
+        </div>
+      </div>
+      <div class="stack">
+        <div>
+          <div class="lab">Trace sinh ra</div>
+          <div class="logbox" id="log"></div>
+        </div>
+        <div class="say" aria-live="polite"><b id="sayTitle"></b><span id="sayText"></span></div>
+        <div class="ctrl">
+          <button class="btn primary" id="next" type="button">Bước tiếp</button>
+          <button class="btn" id="reset" type="button">Làm lại</button>
+          <span class="count" id="count"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="h3s">
+    <div class="sec-head"><span class="eyebrow">Phần 3 · Cách làm ra with</span><h2 id="h3s">Ba điều đáng nhớ</h2></div>
+    <div class="map">
+      <div><b>@contextmanager</b><span>Dòng đặt trên hàm, biến hàm thường thành thứ dùng được với <code>with</code>.</span></div>
+      <div><b>yield</b><span>Chia hàm làm hai nửa: <b>trước</b> yield chạy lúc vào with, <b>sau</b> yield chạy lúc ra. Khối code trong with chạy ngay tại vị trí yield.</span></div>
+      <div><b>finally</b><span>Phần luôn chạy, dù bên trong lỗi hay không. Ghi “kết thúc” phải đặt ở đây.</span></div>
+    </div>
+    <p class="lede">Lỗi không bị nuốt. Span ghi nhận lỗi rồi <code>raise</code> để lỗi tiếp tục bay ra ngoài. Trace chỉ là người ghi chép, không phải người chữa lỗi.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="h4s">
+    <div class="sec-head"><span class="eyebrow">Phần 4 · Trong repo</span><h2 id="h4s">Nhìn lại code thật</h2></div>
+    <div class="map">
+      <div><b>agent/trace/context.py → span</b><span>Đúng khuôn trên. Trước yield ghi <code>span_start</code>. Trong <code>finally</code> ghi <code>span_end</code> kèm trạng thái và thời lượng.</span></div>
+      <div><b>agent/trace/context.py → start_run</b><span>Cũng khuôn đó, nhưng ở mức cả lần chạy: ghi <code>run_start</code> khi vào, <code>run_end</code> khi ra, rồi đóng file.</span></div>
+      <div><b>with span(...) as s:</b><span>Phần <code>as s</code> nhận giá trị mà hàm <code>yield</code> ra. Bản thật yield ra một đối tượng nhỏ để bạn gán <code>s.output = ...</code>; <code>span_end</code> sẽ ghi output đó.</span></div>
+    </div>
+    <div class="callout">Bản thật dài hơn bản đơn giản ở trên vì có thêm <code>span_id</code>, <code>parent_id</code>, <code>tool_call_id</code>. Còn khung thì giống hệt: ghi mở đầu, <code>yield</code>, <code>finally</code> ghi kết thúc. Bài 3 sẽ giải thích <code>parent_id</code> lấy ở đâu ra.</div>
+  </section>
+
+  <div class="end"><b>Xem xong thì quay lại chat.</b><p>Mình hỏi từng câu một. Đạt thì sang bài 3.</p></div>
+</div>
+
+<script>
+(function(){
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  /* mỗi dòng code: [html, id] ; id dùng để tô sáng */
+  var SPAN_CODE = [
+    ['<span class="kw">@contextmanager</span>', 'a'],
+    ['<span class="kw">def</span> <span class="fn">span</span>(ten):', 'b'],
+    ['    ghi(<span class="st">"span_start"</span>, ten)        <span class="cm"># 1. chạy lúc VÀO with</span>', 'start'],
+    ['    trang_thai = <span class="st">"ok"</span>', 'st'],
+    ['    <span class="kw">try</span>:', 'try'],
+    ['        <span class="kw">yield</span>                       <span class="cm"># 2. code trong with chạy ở đây</span>', 'yield'],
+    ['    <span class="kw">except</span> Exception:', 'exc'],
+    ['        trang_thai = <span class="st">"error"</span>', 'seterr'],
+    ['        <span class="kw">raise</span>                       <span class="cm"># 3. lỗi vẫn bay ra ngoài</span>', 'raise'],
+    ['    <span class="kw">finally</span>:', 'fin'],
+    ['        ghi(<span class="st">"span_end"</span>, ten, trang_thai)  <span class="cm"># 4. LUÔN chạy</span>', 'end']
+  ];
+  var SC = {
+    ok: {
+      user: [
+        ['<span class="kw">with</span> span(<span class="st">"fetch_url"</span>):', 'w'],
+        ['    trang = tai_trang()', 'u1'],
+        ['    print(<span class="st">"tải xong"</span>)', 'u2'],
+        ['print(<span class="st">"tiếp tục chương trình"</span>)', 'after']
+      ],
+      steps: [
+        {u:'w', s:['a','b','start'], log:'span_start  fetch_url', say:['Vào with','Python gọi span(). Nửa trước yield chạy: ghi “bắt đầu”.']},
+        {u:'u1', s:['st','try','yield'], say:['Tạm dừng ở yield','span nhường chỗ. Code của bạn chạy: tải trang.']},
+        {u:'u2', s:['yield'], say:['Tiếp tục trong with','Không có lỗi, chạy dòng kế.']},
+        {u:'w', s:['fin','end'], log:'span_end    fetch_url  ok', cls:'ok', say:['Ra khỏi with','Quay lại span, chạy tới finally: ghi “kết thúc, ok”.']},
+        {u:'after', s:[], say:['Chạy tiếp','Chương trình tiếp tục bình thường.']}
+      ]
+    },
+    err: {
+      user: [
+        ['<span class="kw">with</span> span(<span class="st">"fetch_url"</span>):', 'w'],
+        ['    trang = tai_trang()    <span class="cm"># lỗi: timeout!</span>', 'u1'],
+        ['    print(<span class="st">"tải xong"</span>)       <span class="cm"># bị bỏ qua</span>', 'u2'],
+        ['print(<span class="st">"tiếp tục chương trình"</span>)', 'after']
+      ],
+      steps: [
+        {u:'w', s:['a','b','start'], log:'span_start  fetch_url', say:['Vào with','Giống tình huống trước: ghi “bắt đầu”.']},
+        {u:'u1', s:['st','try','yield'], err:true, say:['Lỗi!','tai_trang() ném lỗi timeout. Dòng print bên dưới sẽ không chạy.']},
+        {u:'u1', s:['exc','seterr','raise'], err:true, say:['span bắt lỗi','Lỗi bay vào span ở chỗ yield. span đổi trạng thái thành “error” và chuẩn bị ném tiếp.']},
+        {u:'w', s:['fin','end'], log:'span_end    fetch_url  error: timeout', cls:'bad', say:['Vẫn ghi “kết thúc”','finally luôn chạy. Trace có đủ cặp bắt đầu và kết thúc, kèm lý do lỗi.']},
+        {u:'after', s:['raise'], err:true, say:['Lỗi bay ra ngoài','Lỗi không bị nuốt, nên dòng “tiếp tục chương trình” cũng không chạy (trừ khi chỗ khác bắt lỗi). Trace chỉ ghi chép, không chữa lỗi.']}
+      ]
+    },
+    nest: {
+      user: [
+        ['<span class="kw">with</span> span(<span class="st">"nghien-cuu"</span>):', 'w'],
+        ['    <span class="kw">with</span> span(<span class="st">"fetch_url"</span>):', 'w2'],
+        ['        trang = tai_trang()', 'u1'],
+        ['    ghi_chu = tom_tat(trang)', 'u2']
+      ],
+      steps: [
+        {u:'w', s:['a','b','start'], log:'span_start  nghien-cuu', say:['Vào with ngoài','Ghi “bắt đầu nghien-cuu”.']},
+        {u:'w2', s:['a','b','start'], log:'  span_start  fetch_url', indent:true, say:['Vào with trong','Lại gọi span(): ghi “bắt đầu fetch_url”. Dòng này thụt vào vì nó nằm bên trong nghien-cuu.']},
+        {u:'u1', s:['st','try','yield'], say:['Code trong cùng chạy','Tải trang.']},
+        {u:'w2', s:['fin','end'], log:'  span_end    fetch_url  ok', cls:'ok', indent:true, say:['Ra with trong trước','with trong đóng trước: ghi “kết thúc fetch_url”.']},
+        {u:'u2', s:['yield'], say:['Còn đang trong with ngoài','Tóm tắt trang.']},
+        {u:'w', s:['fin','end'], log:'span_end    nghien-cuu  ok', cls:'ok', say:['Ra with ngoài sau','Mở sau thì đóng trước: fetch_url đóng rồi mới tới nghien-cuu. Cặp nào đóng cặp đó, không bao giờ chéo nhau.']}
+      ]
+    }
+  };
+
+  var cur = 'ok', idx = -1;
+  var userEl = document.getElementById('userCode'), spanEl = document.getElementById('spanCode');
+  var logEl = document.getElementById('log'), titleEl = document.getElementById('sayTitle'), textEl = document.getElementById('sayText');
+  var nextBtn = document.getElementById('next'), countEl = document.getElementById('count');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function drawCode(el, lines, hl, errId){
+    el.innerHTML = lines.map(function(l){
+      var cls = 'l' + (hl.indexOf(l[1]) >= 0 ? (errId && hl.indexOf(l[1]) >= 0 && errId === l[1] ? ' err' : ' hl') : '');
+      return '<span class="' + cls + '">' + l[0] + '</span>';
+    }).join('');
+  }
+  function render(){
+    var sc = SC[cur], st = idx >= 0 ? sc.steps[idx] : null;
+    drawCode(userEl, sc.user, st ? [st.u] : [], st && st.err ? st.u : null);
+    drawCode(spanEl, SPAN_CODE, st ? st.s : [], null);
+    var rows = [];
+    for (var i = 0; i <= idx; i++){
+      var s = sc.steps[i];
+      if (s.log) rows.push('<div class="row' + (i === idx && !reduce ? ' fresh' : '') + '"><span class="' + (s.cls || '') + '">' + esc(s.log) + '</span></div>');
+    }
+    logEl.innerHTML = rows.length ? rows.join('') : '<span class="ph">(chưa có dòng nào)</span>';
+    if (st){ titleEl.textContent = st.say[0]; textEl.textContent = st.say[1]; }
+    else { titleEl.textContent = 'Sẵn sàng'; textEl.textContent = 'Bấm “Bước tiếp” để chạy dòng đầu tiên.'; }
+    countEl.textContent = (idx + 1) + ' / ' + sc.steps.length;
+    nextBtn.disabled = idx >= sc.steps.length - 1;
+  }
+  nextBtn.addEventListener('click', function(){ if (idx < SC[cur].steps.length - 1){ idx++; render(); } });
+  document.getElementById('reset').addEventListener('click', function(){ idx = -1; render(); });
+  Array.prototype.forEach.call(document.querySelectorAll('.seg button'), function(b){
+    b.addEventListener('click', function(){
+      cur = b.getAttribute('data-sc'); idx = -1;
+      Array.prototype.forEach.call(document.querySelectorAll('.seg button'), function(o){ o.setAttribute('aria-pressed', String(o === b)); });
+      render();
+    });
+  });
+  render();
+})();
+</script>

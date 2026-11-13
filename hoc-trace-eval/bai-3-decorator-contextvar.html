@@ -1,0 +1,274 @@
+<title>Decorator và ContextVar · Bài 3</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: trang dọc. Phần 1 là công tắc bật tắt decorator. Phần 2 là bộ chạy từng bước có thêm một "bảng thông báo" thay đổi theo từng dòng. */
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --ink:#16202C; --muted:#5A6576; --line:#D9DEE6;
+  --accent:#1D5BCF; --accent-soft:#E3ECFB; --ok:#17804F; --ok-soft:#DDF3E8; --err:#C03328; --err-soft:#FBE3E0; --warn:#A8670F; --warn-soft:#FBEFD9;
+  --term-bg:#111923; --term-fg:#D6DEE9; --term-dim:#6F7C8E; --term-sel:#22344D; --term-line:#253244;
+  --c-kw:#E59AD6; --c-str:#A9D98B; --c-cmt:#6F7C8E; --c-fn:#7FB0FF; --c-hl:#F2B963;
+  --display:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif; --body:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1218; --surface:#141B24; --ink:#E5EAF1; --muted:#9AA5B5; --line:#283342;
+  --accent:#7DA6FF; --accent-soft:#1B2A45; --ok:#4CC98C; --ok-soft:#163626; --err:#F2786C; --err-soft:#3D1D1A; --warn:#E6AC52; --warn-soft:#3A2C14;
+  --term-bg:#0A0F15; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0D1218; --surface:#141B24; --ink:#E5EAF1; --muted:#9AA5B5; --line:#283342;
+  --accent:#7DA6FF; --accent-soft:#1B2A45; --ok:#4CC98C; --ok-soft:#163626; --err:#F2786C; --err-soft:#3D1D1A; --warn:#E6AC52; --warn-soft:#3A2C14;
+  --term-bg:#0A0F15; color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:52px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.6vw,42px);font-weight:800;letter-spacing:-.02em}
+h2{font-size:clamp(21px,2.6vw,26px);font-weight:800}
+p{margin:0}
+code{font-family:var(--mono);font-size:.88em}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);max-width:62ch}
+.sec{display:flex;flex-direction:column;gap:16px}
+.sec-head{display:flex;flex-direction:column;gap:6px}
+.sec-head .eyebrow{color:var(--accent)}
+.steps{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.step{font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.step.done{color:var(--ok);border-color:var(--ok)}
+.step.now{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+.btn{font:600 13px var(--body);border-radius:8px;padding:7px 12px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn:hover{border-color:var(--accent)} .btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0A0F15}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#0A0F15}}
+.btn:focus-visible,.seg button:focus-visible,.sw input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg button{font:600 13px var(--body);padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+pre.code{margin:0;background:var(--term-bg);color:var(--term-fg);border-radius:12px;padding:12px 0;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.75;border:1px solid var(--term-line)}
+pre.code .l{display:block;padding:0 14px;white-space:pre;border-left:3px solid transparent}
+pre.code .l.hl{background:var(--term-sel);border-left-color:var(--c-hl)}
+.kw{color:var(--c-kw)} .st{color:var(--c-str)} .cm{color:var(--c-cmt)} .fn{color:var(--c-fn)}
+.lab{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.logbox{background:var(--term-bg);color:var(--term-fg);border-radius:12px;border:1px solid var(--term-line);padding:12px 14px;min-height:112px;font-family:var(--mono);font-size:12.5px;line-height:1.8}
+.logbox .ph{color:var(--term-dim)} .logbox .row{white-space:pre-wrap;overflow-wrap:anywhere}
+.logbox .row.fresh{animation:pop .5s ease-out}
+@keyframes pop{from{background:var(--term-sel)}to{background:transparent}}
+.logbox .pid{color:#F2B963}
+.sw{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+.sw input{width:18px;height:18px}
+.say{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:76px;font-size:15px}
+.say b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ctrl .count{font-size:13px;color:var(--muted);margin-left:auto;font-family:var(--mono)}
+.callout{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:15px}
+.callout.warn{background:var(--warn-soft)}
+
+/* bảng thông báo */
+.board{border:2px dashed var(--accent);border-radius:14px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:6px}
+.board .t{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.board .v{font-family:var(--mono);font-size:15px;font-weight:600;min-height:26px}
+.board .v.empty{color:var(--muted);font-weight:400}
+.board .note{font-size:13.5px;color:var(--muted)}
+.callers{display:flex;flex-direction:column;gap:0;margin:0;padding:0;list-style:none;font-family:var(--mono);font-size:13px}
+.callers li{padding:6px 12px;border:1px solid var(--line);border-bottom:none;background:var(--surface)}
+.callers li:last-child{border-bottom:1px solid var(--line);border-radius:0 0 10px 10px}
+.callers li:first-child{border-radius:10px 10px 0 0}
+.callers li.me{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+.callers li.me::after{content:"  ← đang đọc bảng"; font-weight:400;font-family:var(--body);font-size:12.5px;color:var(--accent)}
+.map{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.map > div{border-top:2px solid var(--ink);padding-top:8px;display:flex;flex-direction:column;gap:4px}
+.map b{font-family:var(--mono);font-size:13px}
+.map span{font-size:14.5px;color:var(--muted)}
+.end{background:var(--ink);color:var(--bg);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:6px}
+.end b{font-family:var(--display);font-size:19px}
+@media (prefers-reduced-motion: reduce){.logbox .row.fresh{animation:none}}
+</style>
+
+<div class="wrap">
+  <header class="sec" style="gap:14px">
+    <span class="eyebrow">SE373 · Nhóm 15 · Issue #7</span>
+    <h1>Áo khoác và bảng thông báo</h1>
+    <p class="lede">Bài 3 giải thích hai thứ: <code>@traced</code> (decorator) và <code>ContextVar</code>. Ghép lại, chúng cho biết vì sao <code>LLMClient</code> tự ghi được trace mà không ai đưa tracer cho nó.</p>
+    <div class="steps" aria-label="Lộ trình">
+      <span class="step done">1 · Bức tranh lớn</span><span class="step done">2 · with</span>
+      <span class="step now">3 · decorator, ContextVar</span><span class="step">4 · Code #7</span><span class="step">5 · Thiết kế #8</span>
+    </div>
+  </header>
+
+  <section class="sec" aria-labelledby="a1">
+    <div class="sec-head"><span class="eyebrow">Phần 1 · Decorator</span><h2 id="a1">Mặc áo khoác cho hàm</h2>
+      <p class="lede">Bạn có một hàm tải trang. Muốn nó được ghi trace mà không sửa ruột hàm, thì “mặc áo” cho nó bằng một dòng <code>@traced</code> đặt ngay phía trên.</p></div>
+    <div class="two">
+      <div class="stack">
+        <div class="lab">Code của bạn</div>
+        <pre class="code" id="decCode"></pre>
+        <label class="sw"><input type="checkbox" id="decOn"> Mặc áo <code>@traced("tool")</code></label>
+        <div class="ctrl"><button class="btn primary" id="decCall" type="button">Gọi tai_trang("cau-dat")</button><button class="btn" id="decClear" type="button">Xóa trace</button></div>
+      </div>
+      <div class="stack">
+        <div class="lab">Trace sinh ra (đang trong một lần chạy)</div>
+        <div class="logbox" id="decLog"></div>
+        <div class="say" aria-live="polite"><b id="decTitle"></b><span id="decText"></span></div>
+      </div>
+    </div>
+    <div class="lab" style="margin-top:6px">Áo khoác bên trong là gì? Chính là bài 2, bọc tự động</div>
+<pre class="code"><span class="l"><span class="kw">def</span> <span class="fn">traced</span>(ham):                          <span class="cm"># nhận hàm của bạn</span></span><span class="l">    <span class="kw">def</span> <span class="fn">ao_khoac</span>(*tham_so):                 <span class="cm"># tạo ra một hàm mới, thay chỗ hàm cũ</span></span><span class="l">        <span class="kw">with</span> span(<span class="st">"tool"</span>, ham.__name__, input=tham_so):   <span class="cm"># ← bài 2</span></span><span class="l">            ket_qua = ham(*tham_so)             <span class="cm"># chạy hàm thật bên trong</span></span><span class="l">            <span class="kw">return</span> ket_qua                    <span class="cm"># và ghi kết quả vào span_end</span></span><span class="l">    <span class="kw">return</span> ao_khoac</span></pre>
+    <div class="callout">Dòng <code>@traced("tool")</code> ở trên hàm chỉ là cách viết tắt của <code>tai_trang = traced("tool")(tai_trang)</code>. Mỗi lần ai gọi <code>tai_trang(...)</code>, thật ra họ gọi cái áo khoác, và áo khoác mới gọi hàm thật. Dùng <code>@traced</code> cho mọi tool thì UC khỏi phải tự viết <code>with span</code> ở từng chỗ gọi.</div>
+  </section>
+
+  <section class="sec" aria-labelledby="a2">
+    <div class="sec-head"><span class="eyebrow">Phần 2 · ContextVar</span><h2 id="a2">Vấn đề: hàm nằm sâu muốn ghi trace, nhưng chẳng ai đưa tracer cho nó</h2></div>
+    <p class="lede">Để ghi được, một hàm cần biết “ghi vào file nào” và “đang nằm trong span nào”. Cách vụng là truyền tracer qua từng hàm một:</p>
+<pre class="code"><span class="l">node(tracer)  →  goi_llm(tracer)  →  client.chat(tracer)  →  _emit(tracer)</span><span class="l"><span class="cm"># mọi hàm đều phải mang theo tracer, dù chúng chẳng dùng. Quên một chỗ là mất trace.</span></span></pre>
+    <p class="lede">Cách của repo: treo một <b>bảng thông báo</b> cho cả lần chạy. <code>start_run</code> viết lên bảng, mọi hàm tự nhìn bảng khi cần. Cái bảng đó là <code>ContextVar</code> (<code>_ACTIVE</code> trong <code>context.py</code>).</p>
+  </section>
+
+  <section class="sec" aria-labelledby="a3">
+    <div class="sec-head"><span class="eyebrow">Phần 3 · Chạy thử</span><h2 id="a3">Xem bảng thay đổi qua từng dòng</h2>
+      <p class="lede">Bấm “Bước tiếp”. Ô màu xanh nét đứt là bảng thông báo. Để ý <code>parent_id</code> trong trace lấy ở đâu ra.</p></div>
+    <div class="seg" role="group" aria-label="Chọn tình huống">
+      <button type="button" data-sc="run" aria-pressed="true">Có start_run</button>
+      <button type="button" data-sc="norun" aria-pressed="false">Quên start_run</button>
+    </div>
+    <div class="two">
+      <div class="stack">
+        <div class="lab">Code chạy</div>
+        <pre class="code" id="runCode"></pre>
+        <div class="lab">Ai đang đọc bảng</div>
+        <ul class="callers" id="callers"></ul>
+      </div>
+      <div class="stack">
+        <div class="board"><span class="t">Bảng thông báo (ContextVar)</span><span class="v" id="boardV"></span><span class="note" id="boardN"></span></div>
+        <div class="lab">Trace sinh ra</div>
+        <div class="logbox" id="runLog"></div>
+        <div class="say" aria-live="polite"><b id="runTitle"></b><span id="runText"></span></div>
+        <div class="ctrl"><button class="btn primary" id="next" type="button">Bước tiếp</button><button class="btn" id="reset" type="button">Làm lại</button><span class="count" id="count"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="a4">
+    <div class="sec-head"><span class="eyebrow">Phần 4 · Điều rút ra</span><h2 id="a4">Bốn điều cần nhớ</h2></div>
+    <div class="map">
+      <div><b>Bảng giữ (tracer, span hiện tại)</b><span>Hai thứ hàm cần để ghi. Vào span mới thì bảng đổi sang span đó, ra khỏi span thì bảng trả về như cũ.</span></div>
+      <div><b>parent_id lấy từ bảng</b><span>Span mới đọc bảng, thấy span đang mở là cha của mình. Nhờ vậy cây span tự dựng, không ai truyền tay.</span></div>
+      <div><b>LLMClient tự ghi</b><span>Nó chỉ cần đọc bảng khi gọi LLM xong. Không cần ai đưa tracer lúc tạo client. Đây là dòng <code>_emit</code> trong <code>client.py</code>.</span></div>
+      <div><b>Quên start_run thì sao</b><span>Bảng trống, mọi hàm ghi trace tự không làm gì, và không báo lỗi. Code agent chạy được cả khi không bật trace.</span></div>
+    </div>
+    <div class="callout warn"><b>Một giới hạn đã được ghi trong repo:</b> bảng đi theo <code>asyncio.to_thread</code> nhưng <b>không</b> đi theo luồng tự tạo bằng <code>threading.Thread</code>. Hàm chạy trong luồng đó nhìn bảng thấy trống, nên trace bị mất mà không có lỗi. Backend (#20) vì vậy phải chạy agent bằng <code>asyncio.to_thread</code>.</div>
+  </section>
+
+  <div class="end"><b>Xem xong thì quay lại chat.</b><p>Mình hỏi từng câu một. Đạt thì sang bài 4: đi qua code #7.</p></div>
+</div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function lines(arr, hl){ return arr.map(function(l){ return '<span class="l' + (hl.indexOf(l[1]) >= 0 ? ' hl' : '') + '">' + l[0] + '</span>'; }).join(''); }
+
+  /* ---- Phần 1: decorator ---- */
+  var decEl = document.getElementById('decCode'), decOn = document.getElementById('decOn'), decLog = document.getElementById('decLog');
+  var decRows = [];
+  function drawDec(hl){
+    var code = [];
+    if (decOn.checked) code.push(['<span class="kw">@traced</span>(<span class="st">"tool"</span>)', 'at']);
+    code.push(['<span class="kw">def</span> <span class="fn">tai_trang</span>(ten):', 'def']);
+    code.push(['    <span class="kw">return</span> <span class="st">"&lt;html&gt;…"</span>   <span class="cm"># ruột hàm: không sửa gì</span>', 'body']);
+    decEl.innerHTML = lines(code, hl || []);
+  }
+  function drawDecLog(fresh){
+    decLog.innerHTML = decRows.length ? decRows.map(function(r, i){ return '<div class="row' + (fresh && i >= decRows.length - 2 && !reduce ? ' fresh' : '') + '">' + r + '</div>'; }).join('') : '<span class="ph">(trống)</span>';
+  }
+  function say(t, x, tid, xid){ document.getElementById(tid).textContent = t; document.getElementById(xid).textContent = x; }
+  decOn.addEventListener('change', function(){ drawDec(); say(decOn.checked ? 'Đã mặc áo' : 'Chưa mặc áo', decOn.checked ? 'Hàm không đổi một chữ, nhưng giờ mỗi lần gọi sẽ được ghi lại.' : 'Gọi hàm thì chạy bình thường, trace không có gì.', 'decTitle', 'decText'); });
+  document.getElementById('decCall').addEventListener('click', function(){
+    if (decOn.checked){
+      decRows.push('span_start  tool tai_trang  <span class="pid">input={ten: "cau-dat"}</span>');
+      decRows.push('span_end    ok  <span class="pid">output="&lt;html&gt;…"</span>  3 ms');
+      drawDec(['at','def','body']); drawDecLog(true);
+      say('Áo khoác đã ghi', 'Tham số vào thành input, giá trị trả về thành output. Bạn không viết dòng ghi nào.', 'decTitle', 'decText');
+    } else {
+      drawDec(['def','body']); drawDecLog(false);
+      say('Hàm chạy, trace im lặng', 'Không có áo thì không ai ghi. Muốn ghi phải tự bọc with span ở mọi chỗ gọi.', 'decTitle', 'decText');
+    }
+  });
+  document.getElementById('decClear').addEventListener('click', function(){ decRows = []; drawDec(); drawDecLog(false); say('Đã xóa', 'Bật hoặc tắt công tắc rồi gọi lại để so sánh.', 'decTitle', 'decText'); });
+  drawDec(); drawDecLog(false); say('Thử đi', 'Bấm “Gọi” khi chưa mặc áo, rồi bật công tắc và gọi lại.', 'decTitle', 'decText');
+
+  /* ---- Phần 3: bảng thông báo ---- */
+  var CODE = [
+    ['<span class="kw">with</span> start_run(<span class="st">"UC-01"</span>):', 'run'],
+    ['    <span class="kw">with</span> span(<span class="st">"node"</span>, <span class="st">"nghien-cuu"</span>):', 's1'],
+    ['        <span class="kw">with</span> span(<span class="st">"tool"</span>, <span class="st">"fetch_url"</span>):', 's2'],
+    ['            event(<span class="st">"retrieval"</span>, …)', 'ev'],
+    ['        llm.chat(…)      <span class="cm"># LLMClient tự ghi</span>', 'llm']
+  ];
+  var QUEN_CODE = [
+    ['<span class="cm"># (quên dòng with start_run)</span>', 'run'],
+    ['<span class="kw">with</span> span(<span class="st">"node"</span>, <span class="st">"nghien-cuu"</span>):', 's1'],
+    ['    <span class="kw">with</span> span(<span class="st">"tool"</span>, <span class="st">"fetch_url"</span>):', 's2'],
+    ['        event(<span class="st">"retrieval"</span>, …)', 'ev'],
+    ['    llm.chat(…)      <span class="cm"># LLMClient tự ghi</span>', 'llm']
+  ];
+  var SC = {
+    run: { code: CODE, steps: [
+      {hl:'run', board:'(tracer, null)', note:'start_run vừa viết lên bảng: có tracer, chưa có span nào.', log:'run_start  UC-01', callers:['start_run'], say:['Mở lần chạy','start_run đặt tracer lên bảng và ghi run_start. span_id của sự kiện này là null vì chưa ở trong span nào.']},
+      {hl:'s1', board:'(tracer, s1)', note:'span nghien-cuu đọc bảng: span đang mở là null, nên cha của mình là null. Rồi nó ghi tên mình lên bảng.', log:'span_start  s1  nghien-cuu  parent_id=null', callers:['start_run','span nghien-cuu'], say:['Vào span ngoài','span đọc bảng để biết cha là ai (null), rồi đổi bảng thành s1.']},
+      {hl:'s2', board:'(tracer, s2)', note:'span fetch_url đọc bảng: đang mở là s1, nên cha của mình là s1. Rồi ghi s2 lên bảng.', log:'span_start  s2  fetch_url  parent_id=s1', callers:['start_run','span nghien-cuu','span fetch_url'], say:['Vào span trong','Đây là chỗ parent_id=s1 ra đời: do đọc bảng, không ai truyền tay.']},
+      {hl:'ev', board:'(tracer, s2)', note:'event đọc bảng: đang ở s2, nên gắn sự kiện vào s2.', log:'retrieval  span_id=s2', callers:['start_run','span nghien-cuu','span fetch_url','event'], me:3, say:['event ghi vào đúng span','UC không phải nói “tôi đang ở s2”. Bảng đã biết. Nhờ vậy retrieval nằm trong span của tool, như tài liệu dặn.']},
+      {hl:'llm', board:'(tracer, s1)', note:'Ra khỏi span fetch_url: bảng được trả về s1 như trước khi vào. Rồi LLMClient đọc bảng.', log:'span_end    s2  ok\nllm_call    span_id=s1', callers:['start_run','span nghien-cuu','llm.chat → _emit'], me:2, say:['LLMClient tự ghi','Nó chưa hề được đưa tracer. Nó chỉ nhìn bảng, thấy (tracer, s1), nên ghi llm_call vào s1. Bảng đã được trả về s1 khi ra khỏi span fetch_url.']},
+      {hl:'run', board:'(trống)', note:'Ra hết các with: bảng trở về trống.', log:'span_end    s1  ok\nrun_end    ok', callers:[], say:['Kết thúc','Mỗi lần ra khỏi with, bảng được trả về giá trị trước đó. Cuối cùng lại trống.']}
+    ]},
+    norun: { code: QUEN_CODE, steps: [
+      {hl:'run', board:'(trống)', note:'Không ai viết lên bảng.', log:null, callers:[], say:['Chưa có run','Bảng trống. Mọi hàm ghi trace sẽ nhìn bảng và thấy không có gì.']},
+      {hl:'s1', board:'(trống)', note:'span đọc bảng: trống, nên không làm gì, chỉ chạy code bên trong.', log:null, callers:['span nghien-cuu'], me:0, say:['span im lặng','Không có tracer thì span không ghi, nhưng cũng không báo lỗi. Code bên trong vẫn chạy bình thường.']},
+      {hl:'s2', board:'(trống)', note:'Vẫn trống.', log:null, callers:['span nghien-cuu','span fetch_url'], me:1, say:['Vẫn im lặng','Không dòng nào được ghi.']},
+      {hl:'ev', board:'(trống)', note:'event đọc bảng: trống.', log:null, callers:['span nghien-cuu','span fetch_url','event'], me:2, say:['event không làm gì','Không lỗi, không ghi gì.']},
+      {hl:'llm', board:'(trống)', note:'LLMClient đọc bảng: trống.', log:null, callers:['span nghien-cuu','llm.chat → _emit'], me:1, say:['LLMClient cũng im','Gọi LLM vẫn chạy và trả kết quả, chỉ là không có dòng llm_call nào. Đây là cái bẫy: quên start_run thì trace rỗng mà không ai báo.']}
+    ]}
+  };
+  var cur = 'run', idx = -1;
+  var codeEl = document.getElementById('runCode'), callersEl = document.getElementById('callers'), logEl = document.getElementById('runLog');
+  var boardV = document.getElementById('boardV'), boardN = document.getElementById('boardN'), nextBtn = document.getElementById('next'), countEl = document.getElementById('count');
+  function renderRun(){
+    var sc = SC[cur], st = idx >= 0 ? sc.steps[idx] : null;
+    codeEl.innerHTML = lines(sc.code, st ? [st.hl] : []);
+    var rows = [];
+    for (var i = 0; i <= idx; i++){
+      var s = sc.steps[i];
+      if (s.log) s.log.split('\n').forEach(function(t){ rows.push('<div class="row' + (i === idx && !reduce ? ' fresh' : '') + '">' + esc(t).replace(/(parent_id=\w+|span_id=\w+)/, '<span class="pid">$1</span>') + '</div>'); });
+    }
+    logEl.innerHTML = rows.length ? rows.join('') : '<span class="ph">' + (idx >= 0 && cur === 'norun' ? '(trống: không có dòng nào, cũng không có lỗi)' : '(chưa có dòng nào)') + '</span>';
+    if (st){
+      boardV.textContent = st.board; boardV.className = 'v' + (st.board.indexOf('trống') >= 0 ? ' empty' : '');
+      boardN.textContent = st.note;
+      document.getElementById('runTitle').textContent = st.say[0]; document.getElementById('runText').textContent = st.say[1];
+      var me = st.me != null ? st.me : st.callers.length - 1;
+      callersEl.innerHTML = st.callers.length ? st.callers.map(function(c, i){ return '<li' + (i === me && /event|_emit|span/.test(c) ? ' class="me"' : '') + '>' + esc(c) + '</li>'; }).join('') : '<li>(không còn ai)</li>';
+    } else {
+      boardV.textContent = '(trống)'; boardV.className = 'v empty'; boardN.textContent = 'Chưa chạy dòng nào.';
+      document.getElementById('runTitle').textContent = 'Sẵn sàng'; document.getElementById('runText').textContent = 'Bấm “Bước tiếp”.';
+      callersEl.innerHTML = '<li>(chưa chạy)</li>';
+    }
+    countEl.textContent = (idx + 1) + ' / ' + sc.steps.length;
+    nextBtn.disabled = idx >= sc.steps.length - 1;
+  }
+  nextBtn.addEventListener('click', function(){ if (idx < SC[cur].steps.length - 1){ idx++; renderRun(); } });
+  document.getElementById('reset').addEventListener('click', function(){ idx = -1; renderRun(); });
+  Array.prototype.forEach.call(document.querySelectorAll('.seg button'), function(b){
+    b.addEventListener('click', function(){
+      cur = b.getAttribute('data-sc'); idx = -1;
+      Array.prototype.forEach.call(document.querySelectorAll('.seg button'), function(o){ o.setAttribute('aria-pressed', String(o === b)); });
+      renderRun();
+    });
+  });
+  renderRun();
+})();
+</script>

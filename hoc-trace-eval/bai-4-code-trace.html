@@ -1,0 +1,331 @@
+<title>Đi qua code trace · Bài 4</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: trang dọc. Phần 1 là sơ đồ đường đi của một sự kiện (bấm vào từng ô). Phần 2 chạy từng dòng hàm Tracer.event. Phần 3 là hai thí nghiệm nhỏ về che secret. */
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --ink:#16202C; --muted:#5A6576; --line:#D9DEE6;
+  --accent:#1D5BCF; --accent-soft:#E3ECFB; --ok:#17804F; --ok-soft:#DDF3E8; --err:#C03328; --err-soft:#FBE3E0; --warn:#A8670F; --warn-soft:#FBEFD9;
+  --term-bg:#111923; --term-fg:#D6DEE9; --term-dim:#6F7C8E; --term-sel:#22344D; --term-line:#253244;
+  --c-kw:#E59AD6; --c-str:#A9D98B; --c-cmt:#6F7C8E; --c-fn:#7FB0FF; --c-hl:#F2B963;
+  --display:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif; --body:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1218; --surface:#141B24; --ink:#E5EAF1; --muted:#9AA5B5; --line:#283342;
+  --accent:#7DA6FF; --accent-soft:#1B2A45; --ok:#4CC98C; --ok-soft:#163626; --err:#F2786C; --err-soft:#3D1D1A; --warn:#E6AC52; --warn-soft:#3A2C14;
+  --term-bg:#0A0F15; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0D1218; --surface:#141B24; --ink:#E5EAF1; --muted:#9AA5B5; --line:#283342;
+  --accent:#7DA6FF; --accent-soft:#1B2A45; --ok:#4CC98C; --ok-soft:#163626; --err:#F2786C; --err-soft:#3D1D1A; --warn:#E6AC52; --warn-soft:#3A2C14;
+  --term-bg:#0A0F15; color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:52px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.6vw,42px);font-weight:800;letter-spacing:-.02em}
+h2{font-size:clamp(21px,2.6vw,26px);font-weight:800}
+h3{font-size:16px;font-weight:600}
+p{margin:0}
+code{font-family:var(--mono);font-size:.88em}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);max-width:64ch}
+.sec{display:flex;flex-direction:column;gap:16px}
+.sec-head{display:flex;flex-direction:column;gap:6px}
+.sec-head .eyebrow{color:var(--accent)}
+.steps{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.step{font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.step.done{color:var(--ok);border-color:var(--ok)}
+.step.now{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+.btn{font:600 13px var(--body);border-radius:8px;padding:7px 12px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn:hover{border-color:var(--accent)} .btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0A0F15}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#0A0F15}}
+.btn:focus-visible,.node:focus-visible,.seg button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg button{font:600 13px var(--body);padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+pre.code{margin:0;background:var(--term-bg);color:var(--term-fg);border-radius:12px;padding:12px 0;overflow-x:auto;font-family:var(--mono);font-size:12.8px;line-height:1.75;border:1px solid var(--term-line)}
+pre.code .l{display:block;padding:0 14px;white-space:pre;border-left:3px solid transparent}
+pre.code .l.hl{background:var(--term-sel);border-left-color:var(--c-hl)}
+.kw{color:var(--c-kw)} .st{color:var(--c-str)} .cm{color:var(--c-cmt)} .fn{color:var(--c-fn)}
+.lab{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.say{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-height:96px;font-size:15px}
+.say b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ctrl .count{font-size:13px;color:var(--muted);margin-left:auto;font-family:var(--mono)}
+.callout{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:15px}
+.callout.warn{background:var(--warn-soft)}
+
+/* sơ đồ */
+.pipe{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px}
+.pipe .arrow{align-self:center;color:var(--muted);font-size:18px}
+.node{flex:1 1 150px;min-width:0;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;font:inherit;color:inherit;display:flex;flex-direction:column;gap:2px}
+.node:hover{border-color:var(--accent)}
+.node[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.node .f{font-family:var(--mono);font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+.node .n{font-weight:600;font-size:14.5px}
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-height:118px}
+.detail .who{font-family:var(--mono);font-size:12.5px;color:var(--accent)}
+.sources{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
+.chipc{font-family:var(--mono);font-size:12.5px;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+
+/* thí nghiệm */
+.demo{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.slider{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:14px}
+.slider input[type=range]{flex:1 1 220px;min-width:0}
+.slider output{font-family:var(--mono);font-weight:600}
+.out{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.box.good{border-color:var(--ok)} .box.bad{border-color:var(--err)}
+.box h3{font-size:14px}
+.box .txt{font-family:var(--mono);font-size:12.5px;line-height:1.7;overflow-wrap:anywhere;background:var(--bg);border-radius:8px;padding:8px 10px}
+.box .verdict{font-size:14px;font-weight:600}
+.box.good .verdict{color:var(--ok)} .box.bad .verdict{color:var(--err)}
+mark.leak{background:var(--err-soft);color:var(--err);font-weight:700;border-radius:3px;padding:0 2px}
+mark.red{background:var(--ok-soft);color:var(--ok);border-radius:3px;padding:0 2px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.k{font-family:var(--mono);font-size:13px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+td .hidden{color:var(--ok);font-weight:600} td .wrong{color:var(--err);font-weight:600}
+
+/* test & vấn đáp */
+.map{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.map > div{border-top:2px solid var(--ink);padding-top:8px;display:flex;flex-direction:column;gap:4px}
+.map b{font-family:var(--mono);font-size:13px;overflow-wrap:anywhere}
+.map span{font-size:14.5px;color:var(--muted)}
+details{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+details + details{margin-top:8px}
+summary{cursor:pointer;font-weight:600}
+details p{margin-top:8px;color:var(--muted);font-size:15px}
+.end{background:var(--ink);color:var(--bg);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:6px}
+.end b{font-family:var(--display);font-size:19px}
+@media (max-width:700px){.pipe .arrow{transform:rotate(90deg);width:100%;text-align:center}}
+</style>
+
+<div class="wrap">
+  <header class="sec" style="gap:14px">
+    <span class="eyebrow">SE373 · Nhóm 15 · Issue #7</span>
+    <h1>Đi qua code trace của bạn</h1>
+    <p class="lede">Bài 4 nối những gì đã học vào code thật trong <code>agent/trace/</code>. Xong bài này bạn chỉ vào bất kỳ file nào trong thư mục đó cũng nói được nó để làm gì.</p>
+    <div class="steps" aria-label="Lộ trình">
+      <span class="step done">1 · Bức tranh lớn</span><span class="step done">2 · with</span><span class="step done">3 · decorator, ContextVar</span>
+      <span class="step now">4 · Code #7</span><span class="step">5 · Thiết kế #8</span>
+    </div>
+  </header>
+
+  <section class="sec" aria-labelledby="s1">
+    <div class="sec-head"><span class="eyebrow">Phần 1 · Bản đồ</span><h2 id="s1">Một sự kiện đi qua những file nào</h2>
+      <p class="lede">Bấm vào từng ô để xem file đó làm gì.</p></div>
+    <div class="sources"><span>Hai nơi bắt đầu:</span><span class="chipc">code của UC (span, event)</span><span class="chipc">LLMClient (_emit)</span><span>→ cùng đi qua đường ống dưới đây</span></div>
+    <div class="pipe" id="pipe" role="group" aria-label="Các bước của sự kiện">
+      <button class="node" type="button" data-k="ctx" aria-pressed="true"><span class="f">context.py</span><span class="n">event(), span()</span></button>
+      <span class="arrow" aria-hidden="true">→</span>
+      <button class="node" type="button" data-k="trc" aria-pressed="false"><span class="f">tracer.py</span><span class="n">Tracer.event()</span></button>
+      <span class="arrow" aria-hidden="true">→</span>
+      <button class="node" type="button" data-k="san" aria-pressed="false"><span class="f">sanitize.py</span><span class="n">Redactor.clean()</span></button>
+      <span class="arrow" aria-hidden="true">→</span>
+      <button class="node" type="button" data-k="file" aria-pressed="false"><span class="f">traces/&lt;run_id&gt;.jsonl</span><span class="n">file trên đĩa</span></button>
+    </div>
+    <div class="pipe" id="pipe2" role="group" aria-label="File phụ">
+      <button class="node" type="button" data-k="evt" aria-pressed="false"><span class="f">events.py</span><span class="n">tên loại sự kiện</span></button>
+      <button class="node" type="button" data-k="init" aria-pressed="false"><span class="f">__init__.py</span><span class="n">danh sách export</span></button>
+      <button class="node" type="button" data-k="cli" aria-pressed="false"><span class="f">llm/client.py</span><span class="n">_emit()</span></button>
+      <button class="node" type="button" data-k="doc" aria-pressed="false"><span class="f">docs/trace-format.md</span><span class="n">tài liệu định dạng</span></button>
+    </div>
+    <div class="detail" aria-live="polite"><span class="who" id="dWho"></span><h3 id="dTitle"></h3><p id="dText"></p></div>
+  </section>
+
+  <section class="sec" aria-labelledby="s2">
+    <div class="sec-head"><span class="eyebrow">Phần 2 · Trái tim</span><h2 id="s2">Từng dòng của Tracer.event</h2>
+      <p class="lede">Đây là hàm ghi một dòng vào file. Mọi sự kiện đều đi qua nó. Mình rút gọn bớt chú thích; code thật ở <code>tracer.py</code>.</p></div>
+    <div class="two">
+      <div class="stack">
+        <div class="lab">Code (rút gọn)</div>
+        <pre class="code" id="evCode"></pre>
+      </div>
+      <div class="stack">
+        <div class="say" aria-live="polite"><b id="evTitle"></b><span id="evText"></span></div>
+        <div class="ctrl"><button class="btn primary" id="evNext" type="button">Bước tiếp</button><button class="btn" id="evPrev" type="button">Bước trước</button><span class="count" id="evCount"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="s3">
+    <div class="sec-head"><span class="eyebrow">Phần 3 · Che secret</span><h2 id="s3">Hai quyết định thiết kế mà thầy dễ hỏi</h2></div>
+
+    <div class="demo">
+      <h3>Thí nghiệm 1 · Che trước hay cắt trước?</h3>
+      <p class="lede">Một khóa API nằm trong chuỗi dài. Mình thu nhỏ mức cắt để dễ thấy (code thật cắt ở 4.000 ký tự). Kéo thanh trượt rồi so hai cách.</p>
+      <div class="slider"><label for="cut">Cắt ở</label><input id="cut" type="range" min="30" max="70" value="44"><output id="cutOut">44</output><span>ký tự</span></div>
+      <div class="lab" style="margin:0">Chuỗi gốc</div>
+      <div class="box"><div class="txt" id="orig"></div></div>
+      <div class="out">
+        <div class="box" id="bxCut"><h3>Cắt trước, che sau</h3><div class="txt" id="outCut"></div><div class="verdict" id="vCut"></div></div>
+        <div class="box" id="bxRed"><h3>Che trước, cắt sau (cách của repo)</h3><div class="txt" id="outRed"></div><div class="verdict" id="vRed"></div></div>
+      </div>
+      <p class="lede">Che bằng regex cần thấy cả khóa (ít nhất 16 ký tự sau “sk-”). Cắt trước thì khóa chỉ còn nửa đầu, regex không nhận ra, và nửa đầu đó lọt ra file. Test <code>test_secret_is_redacted_before_truncation</code> kiểm đúng điều này.</p>
+    </div>
+
+    <div class="demo">
+      <h3>Thí nghiệm 2 · Khớp tên key: chính xác hay chứa chữ?</h3>
+      <p class="lede">Che theo tên key: key nào tên giống secret thì che giá trị. Bấm đổi cách khớp.</p>
+      <div class="seg" role="group" aria-label="Cách khớp">
+        <button type="button" data-m="exact" aria-pressed="true">Khớp chính xác (repo)</button>
+        <button type="button" data-m="sub" aria-pressed="false">Khớp chứa chữ “token”, “key”…</button>
+      </div>
+      <div class="tablewrap"><table><thead><tr><th>Key</th><th>Giá trị gốc</th><th>Trong file trace</th></tr></thead><tbody id="keyRows"></tbody></table></div>
+      <p class="lede" id="keyNote"></p>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="s4">
+    <div class="sec-head"><span class="eyebrow">Phần 4 · Test</span><h2 id="s4">Test không gọi LLM thật như thế nào</h2></div>
+    <p class="lede">CI không có khóa API và gọi LLM thật thì tốn tiền, lại cho kết quả mỗi lần một khác. Nên test dùng <code>FakeSDK</code> trong <code>tests/fakes.py</code>: một đối tượng giả đóng vai SDK, trả lần lượt các phản hồi dựng sẵn. Toàn bộ logic của <code>LLMClient</code> vẫn chạy thật, chỉ phần “gọi ra mạng” là giả.</p>
+<pre class="code"><span class="l"><span class="kw">def</span> <span class="fn">test_run_writes_start_and_end_with_input_and_output</span>(tmp_path):</span><span class="l">    <span class="kw">with</span> start_run(<span class="st">"UC-00"</span>, {<span class="st">"brief"</span>: <span class="st">"x"</span>}, trace_dir=tmp_path, run_id=RUN) <span class="kw">as</span> tracer:   <span class="cm"># chạy một lần giả, ghi vào thư mục tạm</span></span><span class="l">        tracer.output = {<span class="st">"bai"</span>: <span class="st">"viết xong"</span>}</span><span class="l">    events = read_events(trace_file(tmp_path))                    <span class="cm"># đọc file vừa ghi</span></span><span class="l">    <span class="kw">assert</span> types(events) == [<span class="st">"run_start"</span>, <span class="st">"run_end"</span>]            <span class="cm"># đúng hai dòng, đúng thứ tự</span></span><span class="l">    <span class="kw">assert</span> [e[<span class="st">"seq"</span>] <span class="kw">for</span> e <span class="kw">in</span> events] == [1, 2]                <span class="cm"># seq tăng dần</span></span></pre>
+    <div class="map">
+      <div><b>test_tracer.py</b><span>Run, span lồng nhau, lỗi, <code>@traced</code>, listener, luồng, và test ghép <code>LLMClient</code> + <code>FakeSDK</code> trong <code>start_run</code>. Có 24 hàm test.</span></div>
+      <div><b>test_trace_sanitize.py</b><span>Che theo giá trị, theo tên key, theo mẫu; cắt chuỗi; che trước rồi mới cắt. Có 14 hàm test (một số chạy nhiều bộ dữ liệu).</span></div>
+      <div><b>test_llm_client.py</b><span>Các trường mới của <code>llm_call</code>, <code>llm_error</code>, <code>llm_structured</code>, và việc tự lấy tracer.</span></div>
+    </div>
+    <div class="callout warn">Mình chưa chạy <code>pytest</code> trên máy bạn (phiên này chỉ đọc file). Con số 24 và 14 mình đếm từ tên hàm test. Bạn chạy <code>pytest</code> một lần để chắc là tất cả đều xanh.</div>
+  </section>
+
+  <section class="sec" aria-labelledby="s5">
+    <div class="sec-head"><span class="eyebrow">Phần 5 · Luyện vấn đáp</span><h2 id="s5">Năm câu thầy có thể hỏi</h2>
+      <p class="lede">Tự trả lời trước, rồi mới mở đáp án.</p></div>
+    <div>
+      <details><summary>1. Vì sao trace ghi thẳng ra file mà không dùng thư viện hay dịch vụ ngoài?</summary><p>Đề cần mỗi lần chạy có file trace, chạy được offline, tra cứu được. Ghi JSONL ra file là đơn giản nhất mà vẫn đủ. Dịch vụ ngoài thêm phụ thuộc, thêm chỗ lộ dữ liệu, và CI không có mạng ra ngoài.</p></details>
+      <details><summary>2. Vì sao <code>span_end</code> nằm trong <code>finally</code>?</summary><p>Để có đủ cặp bắt đầu/kết thúc kể cả khi bên trong lỗi, kèm thời lượng và lý do lỗi. Không có <code>finally</code> thì lúc lỗi, đúng lúc cần trace nhất, lại mất dòng kết thúc.</p></details>
+      <details><summary>3. <code>LLMClient</code> không được đưa tracer mà vẫn ghi được. Bằng cách nào?</summary><p>Tracer đang chạy được treo trên “bảng thông báo” (<code>ContextVar</code>). <code>_emit</code> trong <code>client.py</code> gọi <code>event(...)</code>, hàm này nhìn bảng, thấy có tracer thì ghi, không thấy thì bỏ qua. Nhờ vậy UC tạo client mà quên truyền gì vẫn không mất <code>llm_call</code>.</p></details>
+      <details><summary>4. Vì sao che secret trước rồi mới cắt chuỗi?</summary><p>Cắt trước có thể chém đôi khóa API. Nửa còn lại không khớp regex nên không bị che, lộ ra file. Che trước thì cả khóa đã thành <code>[REDACTED]</code> rồi mới cắt.</p></details>
+      <details><summary>5. Vì sao không che mọi key có chữ “token”?</summary><p>Vì <code>input_tokens</code> và <code>output_tokens</code> chứa chữ “token”, che luôn sẽ mất số liệu token mà eval cần. Nên repo so khớp chính xác tên key (<code>api_key</code>, <code>password</code>, <code>authorization</code>…).</p></details>
+    </div>
+  </section>
+
+  <div class="end"><b>Xem xong thì quay lại chat.</b><p>Mình hỏi từng câu một. Đạt thì sang bài 5: thiết kế eval runner (#8).</p></div>
+</div>
+
+<script>
+(function(){
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  /* ---- Phần 1 ---- */
+  var D = {
+    ctx:{who:'agent/trace/context.py', t:'Cửa vào cho code agent', x:'Chứa event(), span(), traced(), start_run() và cái “bảng thông báo” (_ACTIVE). Code của UC chỉ cần dùng file này. Nó đọc bảng để biết đang ở run nào, span nào, rồi gọi Tracer.'},
+    trc:{who:'agent/trace/tracer.py', t:'Người ghi sổ', x:'Class Tracer giữ file đang mở, đánh số seq, cộng dồn token và chi phí (totals), gọi các listener. Hàm event() ở đây là nơi mọi dòng được ghi.'},
+    san:{who:'agent/trace/sanitize.py', t:'Người kiểm tra trước khi ghi', x:'Class Redactor: che secret (theo giá trị, theo tên key, theo mẫu regex) rồi cắt chuỗi quá 4.000 ký tự. Mọi giá trị đi qua đây trước khi xuống file.'},
+    file:{who:'traces/<run_id>.jsonl', t:'Kết quả', x:'Mỗi dòng một sự kiện JSON, UTF-8, giữ nguyên tiếng Việt. File được mở bằng chế độ “x”: trùng run_id thì báo lỗi, không ghi đè. Thư mục traces/ không được commit.'},
+    evt:{who:'agent/trace/events.py', t:'Bảng tên', x:'Hai enum: EventType (run_start, llm_call, retrieval…) và SpanKind (node, tool, skill, agent). Chỉ là danh sách tên, để khỏi gõ sai chuỗi.'},
+    init:{who:'agent/trace/__init__.py', t:'Danh sách công khai', x:'Liệt kê những gì bên ngoài được import: span, event, start_run, traced, read_events… Người dùng module chỉ cần from agent.trace import …'},
+    cli:{who:'agent/llm/client.py → _emit', t:'Nơi LLMClient phát sự kiện', x:'Nếu có tham số trace thì gọi nó (dùng cho test), không thì gọi event() để ghi vào lần chạy đang mở. Các sự kiện: llm_call, llm_repair, llm_structured, llm_error, budget_exceeded.'},
+    doc:{who:'docs/trace-format.md', t:'Hợp đồng với cả nhóm', x:'Bảng các loại sự kiện và trường bắt buộc, cách tra ngược câu → chunk → tool call, quy ước cho UC-02, UC-04, UC-10. Người làm viewer (#61) dựa vào đây.'}
+  };
+  function showD(k){
+    document.getElementById('dWho').textContent = D[k].who;
+    document.getElementById('dTitle').textContent = D[k].t;
+    document.getElementById('dText').textContent = D[k].x;
+    Array.prototype.forEach.call(document.querySelectorAll('.node'), function(n){ n.setAttribute('aria-pressed', String(n.getAttribute('data-k') === k)); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.node'), function(n){ n.addEventListener('click', function(){ showD(n.getAttribute('data-k')); }); });
+  showD('ctx');
+
+  /* ---- Phần 2 ---- */
+  var EV = [
+    ['<span class="kw">def</span> <span class="fn">event</span>(self, type_, *, span_id=<span class="kw">None</span>, parent_id=<span class="kw">None</span>, **fields):', 'def'],
+    ['    <span class="kw">with</span> self._lock:', 'lock'],
+    ['        <span class="kw">if</span> self._file.closed:', 'closed'],
+    ['            <span class="kw">return</span>', 'closed'],
+    ['        self._seq += 1', 'seq'],
+    ['        record = self._redactor.clean({', 'clean'],
+    ['            <span class="st">"v"</span>: SCHEMA_VERSION, <span class="st">"ts"</span>: …, <span class="st">"run_id"</span>: self.run_id,', 'env'],
+    ['            <span class="st">"seq"</span>: self._seq, <span class="st">"type"</span>: str(type_),', 'env'],
+    ['            <span class="st">"span_id"</span>: span_id, <span class="st">"parent_id"</span>: parent_id, **fields,', 'env'],
+    ['        })', 'clean'],
+    ['        self._file.write(json.dumps(record, ensure_ascii=<span class="kw">False</span>) + <span class="st">"\\n"</span>)', 'write'],
+    ['        self._file.flush()', 'write'],
+    ['        self.totals.add(record)', 'tot'],
+    ['    <span class="kw">for</span> listener <span class="kw">in</span> self._listeners:', 'lis'],
+    ['        <span class="kw">try</span>: listener(record)', 'lis'],
+    ['        <span class="kw">except</span> Exception: log.warning(…)', 'lis']
+  ];
+  var ES = [
+    {hl:['def'], t:'Được gọi từ đâu', x:'context.event() và span() gọi hàm này, kèm loại sự kiện và các trường riêng (input, output, token…). Tham số **fields gom mọi trường riêng vào một dict.'},
+    {hl:['lock'], t:'Khóa: mỗi lần một người ghi', x:'Nếu hai luồng ghi cùng lúc, dòng có thể chen nhau và seq lệch. Khóa bảo đảm từng sự kiện được ghi trọn vẹn, đúng thứ tự.'},
+    {hl:['closed'], t:'Run đã xong thì bỏ qua', x:'Một luồng chạy muộn có thể gọi sau khi run_end đã ghi và file đã đóng. Dòng này làm sự kiện muộn đó im lặng biến mất thay vì làm sập chương trình.'},
+    {hl:['seq'], t:'Đánh số thứ tự', x:'seq tăng từ 1. Trong file, đọc seq là biết thứ tự thật của các sự kiện.'},
+    {hl:['env','clean'], t:'Dựng “phong bì” rồi đưa qua Redactor', x:'Phong bì gồm v, ts, run_id, seq, type, span_id, parent_id, cộng các trường riêng. Cả dict đi qua redactor.clean: che secret trước, cắt chuỗi dài sau. Từ đây trở xuống, record đã sạch.'},
+    {hl:['write'], t:'Ghi một dòng và flush', x:'json.dumps với ensure_ascii=False giữ nguyên tiếng Việt. flush đẩy xuống đĩa ngay, nên chạy dở hay chương trình chết vẫn còn phần đã ghi. Lỗi ghi file cố ý không bị nuốt: đề bắt buộc có trace.'},
+    {hl:['tot'], t:'Cộng dồn totals', x:'Nếu là llm_call thì cộng token và chi phí; nếu là llm_structured thì cộng số lần sửa. Eval runner sẽ lấy số liệu từ đây, không phải đọc lại file.'},
+    {hl:['lis'], t:'Gọi listener, ngoài khóa', x:'Listener là hàm phụ nhận từng sự kiện đã sạch (sau này backend dùng để đẩy tiến trình lên giao diện). Listener lỗi chỉ bị ghi log, không làm sập run. Chạy ngoài khóa để listener chậm không chặn việc ghi file.'}
+  ];
+  var ei = 0;
+  function drawEv(){
+    document.getElementById('evCode').innerHTML = EV.map(function(l){ return '<span class="l' + (ES[ei].hl.indexOf(l[1]) >= 0 ? ' hl' : '') + '">' + l[0] + '</span>'; }).join('');
+    document.getElementById('evTitle').textContent = ES[ei].t;
+    document.getElementById('evText').textContent = ES[ei].x;
+    document.getElementById('evCount').textContent = (ei + 1) + ' / ' + ES.length;
+    document.getElementById('evPrev').disabled = ei === 0;
+    document.getElementById('evNext').disabled = ei === ES.length - 1;
+  }
+  document.getElementById('evNext').addEventListener('click', function(){ if (ei < ES.length - 1){ ei++; drawEv(); } });
+  document.getElementById('evPrev').addEventListener('click', function(){ if (ei > 0){ ei--; drawEv(); } });
+  drawEv();
+
+  /* ---- Thí nghiệm 1 ---- */
+  var SECRET = 'sk-A1b2C3d4E5f6G7h8I9j0K1l2';
+  var TEXT = 'Gọi API bị lỗi. Khóa của mình là ' + SECRET + ' nên bị từ chối.';
+  var RX = /\bsk-[A-Za-z0-9_\-]{16,}/g;
+  function redact(s){ return s.replace(RX, '[REDACTED]'); }
+  function trunc(s, n){ return s.length > n ? s.slice(0, n) + '…[truncated ' + (s.length - n) + ' chars]' : s; }
+  function mark(s){
+    return esc(s).replace(/sk-[A-Za-z0-9_\-]+/g, function(m){ return '<mark class="leak">' + m + '</mark>'; }).replace(/\[REDACTED\]/g, '<mark class="red">[REDACTED]</mark>');
+  }
+  document.getElementById('orig').innerHTML = esc(TEXT).replace(esc(SECRET), '<mark class="leak">' + esc(SECRET) + '</mark>');
+  function exp1(){
+    var n = Number(document.getElementById('cut').value);
+    document.getElementById('cutOut').textContent = n;
+    var a = redact(trunc(TEXT, n)), b = trunc(redact(TEXT), n);
+    document.getElementById('outCut').innerHTML = mark(a);
+    document.getElementById('outRed').innerHTML = mark(b);
+    var leakA = /sk-[A-Za-z0-9_\-]/.test(a), leakB = /sk-[A-Za-z0-9_\-]/.test(b);
+    var bc = document.getElementById('bxCut'), br = document.getElementById('bxRed');
+    bc.className = 'box ' + (leakA ? 'bad' : 'good'); br.className = 'box ' + (leakB ? 'bad' : 'good');
+    document.getElementById('vCut').textContent = leakA ? 'LỘ: nửa khóa nằm trong file' : 'An toàn ở mức cắt này (thử kéo thanh trượt)';
+    document.getElementById('vRed').textContent = leakB ? 'LỘ' : 'An toàn ở mọi mức cắt';
+  }
+  document.getElementById('cut').addEventListener('input', exp1);
+  exp1();
+
+  /* ---- Thí nghiệm 2 ---- */
+  var ROWS = [['api_key', 'sk-…khóa thật…', true], ['authorization', 'Bearer eyJ…', true], ['input_tokens', '1240', false], ['output_tokens', '410', false], ['password', 'matkhau123', true], ['model', 'deepseek-flash', false]];
+  var SUBS = ['token', 'key', 'password', 'authorization', 'secret'];
+  var mode = 'exact';
+  function drawKeys(){
+    var wrongN = 0;
+    document.getElementById('keyRows').innerHTML = ROWS.map(function(r){
+      var hide = mode === 'exact' ? r[2] : SUBS.some(function(s){ return r[0].indexOf(s) >= 0; });
+      var wrong = hide && !r[2];
+      if (wrong) wrongN++;
+      return '<tr><td class="k">' + r[0] + '</td><td class="k">' + esc(r[1]) + '</td><td class="k">' + (hide ? (wrong ? '<span class="wrong">[REDACTED]  ← che nhầm</span>' : '<span class="hidden">[REDACTED]</span>') : esc(r[1])) + '</td></tr>';
+    }).join('');
+    document.getElementById('keyNote').textContent = mode === 'exact' ? 'Chỉ đúng các key là secret bị che. Số token vẫn còn nguyên cho eval dùng.' : 'Che nhầm ' + wrongN + ' dòng: input_tokens và output_tokens chứa chữ “token”. Eval mất số token để tính chi phí.';
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.seg button'), function(b){
+    b.addEventListener('click', function(){
+      mode = b.getAttribute('data-m');
+      Array.prototype.forEach.call(document.querySelectorAll('.seg button'), function(o){ o.setAttribute('aria-pressed', String(o === b)); });
+      drawKeys();
+    });
+  });
+  drawKeys();
+})();
+</script>
